@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>글로벌 다큐 레퍼런스 뷰어</title>
+  <link rel="icon" type="image/png" href="app-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◉</span>
+      <div>
+        <h1>글로벌 다큐멘터리 레퍼런스 뷰어</h1>
+        <p class="sub">YouTube 기반 · 해외/국내 다큐 채널 최신 흐름 리서치</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="quota" id="quota" title="YouTube Data API 일일 할당량 10,000 유닛 기준 (이 브라우저에서 추정)"></span>
+      <button class="icon-btn" id="btnSettings" title="설정">⚙ 설정</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="채널"></nav>
+
+  <section class="controls">
+    <div class="seg" id="segType" role="tablist" aria-label="콘텐츠 유형">
+      <button data-v="videos" class="on">동영상</button>
+      <button data-v="shorts">쇼츠</button>
+    </div>
+    <div class="seg" id="segSort" role="tablist" aria-label="정렬">
+      <button data-v="date" class="on">최신순</button>
+      <button data-v="views">조회수순</button>
+    </div>
+    <label class="period" id="periodWrap" hidden>
+      기간
+      <select id="period">
+        <option value="7">최근 7일</option>
+        <option value="30" selected>최근 30일</option>
+        <option value="90">최근 90일</option>
+        <option value="365">최근 1년</option>
+        <option value="all">전체 기간</option>
+      </select>
+    </label>
+    <button class="ghost-btn" id="btnRefresh" title="캐시를 무시하고 새로 불러오기">↻ 새로고침</button>
+  </section>
+
+  <div class="status" id="status"></div>
+  <div class="chips" id="chips"></div>
+
+  <main>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" hidden></div>
+    <div class="more-wrap">
+      <button class="more-btn" id="btnMore" hidden>더보기 <span>+40</span></button>
+      <div class="loader" id="loader" hidden><span></span><span></span><span></span></div>
+    </div>
+  </main>
+
+  <!-- 플레이어 모달 -->
+  <div class="modal" id="playerModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="player-box" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+      <button class="close-x" data-close aria-label="닫기">✕</button>
+      <div class="player-frame" id="pmFrame"></div>
+      <div class="player-info">
+        <h2 id="pmTitle"></h2>
+        <div class="pm-meta" id="pmMeta"></div>
+        <div class="pm-actions">
+          <a class="yt-btn" id="pmYt" target="_blank" rel="noopener">YouTube에서 보기 ↗</a>
+          <button class="ghost-btn" id="pmCopy">링크 복사</button>
+        </div>
+        <p class="pm-desc" id="pmDesc"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 설정 모달 -->
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="settings-box" role="dialog" aria-modal="true" aria-labelledby="stTitle">
+      <button class="close-x" data-close aria-label="닫기">✕</button>
+      <h2 id="stTitle">설정</h2>
+      <label class="field">
+        YouTube Data API v3 키
+        <input id="apiKey" type="password" placeholder="AIza..." autocomplete="off" />
+      </label>
+      <p class="hint">
+        키는 이 브라우저(localStorage)에만 저장됩니다.
+        키가 없다면 <a href="#" id="openGuideFromSettings">단계별 발급 가이드</a>를 따라 만들어 보세요.
+      </p>
+      <div class="settings-actions">
+        <button class="primary-btn" id="btnSaveKey">저장</button>
+        <button class="ghost-btn" id="btnClearCache">캐시 비우기</button>
+      </div>
+      <h3>연동 채널</h3>
+      <div class="channel-list" id="channelList"></div>
+      <p class="hint">채널 목록은 <code>config.js</code>의 <code>CHANNELS</code>에서 수정합니다.</p>
+    </div>
+  </div>
+
+  <!-- API 키 발급 가이드 -->
+  <div class="modal" id="guideModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="guide-box" role="dialog" aria-modal="true" aria-labelledby="gdTitle">
+      <button class="close-x" data-close aria-label="닫기">✕</button>
+      <p class="gd-eyebrow">YouTube API 키 발급 가이드</p>
+      <ol class="gd-steps" id="gdSteps"></ol>
+      <div class="gd-body" id="gdBody"></div>
+      <div class="gd-nav">
+        <button class="ghost-btn" id="gdPrev">← 이전</button>
+        <button class="primary-btn" id="gdNext">다음 →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
