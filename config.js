@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────
 
 window.VIEWER_CONFIG = {
-  API_KEY: "",
+  API_KEY: "AIzaSyCx0B29aivCuVsb0aRBCVzuR6GY7CrJ1ps",
 
   CHANNELS: [
     {
