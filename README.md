@@ -18,7 +18,7 @@
 
 | 탭 | YouTube 채널 |
 |---|---|
-| BBC | [@BBC](https://www.youtube.com/@BBC) — 다큐멘터리만 자동 선별 |
+| BBC | [@BBC](https://www.youtube.com/@BBC) — 다큐멘터리만 자동 선별, [@bbcdeepwatch](https://www.youtube.com/@bbcdeepwatch) — BBC 청년층 다큐 채널(BBC Three 계열) |
 | BBC Earth | [@bbcearth](https://www.youtube.com/@bbcearth), [@BBCEarthScience](https://www.youtube.com/@BBCEarthScience) |
 | NOVA PBS | [@novapbs](https://www.youtube.com/@novapbs) |
 | Nature PBS | [@naturepbs](https://www.youtube.com/@naturepbs) |

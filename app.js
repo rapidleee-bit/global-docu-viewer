@@ -398,13 +398,20 @@
 
   const currentCats = () => (state.tab === "all" ? CATEGORIES : [CATEGORIES[+state.tab]]);
 
+  // 채널 항목: "@핸들" 문자열 또는 { handle: "@핸들", filter: {...} } (채널별 필터)
+  const entryRef = (e) => (typeof e === "string" ? e : e.handle);
+
   function currentRefs() {
-    return [...new Set(currentCats().flatMap((c) => c.channels || []))];
+    return [...new Set(currentCats().flatMap((c) => (c.channels || []).map(entryRef)))];
   }
 
+  // 채널 항목에 filter가 있으면 그것을, 없으면 카테고리 filter를 적용
   function filterForRef(ref) {
-    const cat = currentCats().find((c) => (c.channels || []).includes(ref));
-    return normFilter(cat && cat.filter);
+    for (const cat of currentCats()) {
+      const entry = (cat.channels || []).find((e) => entryRef(e) === ref);
+      if (entry) return normFilter(typeof entry === "object" && "filter" in entry ? entry.filter : cat.filter);
+    }
+    return null;
   }
 
   function tabLabel() {
@@ -597,7 +604,10 @@
   function openSettings() {
     $("#apiKey").value = store.get("api_key") || CFG.API_KEY || "";
     $("#channelList").innerHTML = CATEGORIES.map((c) =>
-      `<div class="row"><b>${esc(c.name)}</b><span>${(c.channels || []).map(esc).join(", ") || "(미지정)"}${c.filter ? ` — 필터: ${esc(describeFilter(normFilter(c.filter), false))}` : ""}</span></div>`).join("");
+      `<div class="row"><b>${esc(c.name)}</b><span>${(c.channels || []).map((e) => {
+        const f = typeof e === "object" && "filter" in e ? e.filter : c.filter;
+        return esc(entryRef(e)) + (f ? ` (필터: ${esc(describeFilter(normFilter(f), false))})` : "");
+      }).join("<br>") || "(미지정)"}</span></div>`).join("");
     openModal(els.settings);
   }
 
