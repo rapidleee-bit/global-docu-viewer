@@ -6,7 +6,8 @@
   const CACHE_MS = (CFG.CACHE_MINUTES ?? 30) * 60 * 1000;
   const API = "https://www.googleapis.com/youtube/v3/";
   const SHORTS_MAX_SEC = 180;      // '전체 기간' 검색 모드에서 쇼츠 판별 기준
-  const PERIOD_SCAN_CAP = 1000;    // 기간별 조회수순: 채널당 최대 스캔 개수
+  const SCAN_MAX_PAGES = 50;       // 기간별 조회수순: 이보다 많은 페이지가 필요하면 검색 방식으로 전환
+  const PERIOD_SCAN_CAP = SCAN_MAX_PAGES * 50;
   const LS = "gdv_";
   const SITE = /^https?:/.test(location.origin) ? location.origin : "http://localhost:8080";
   const ALLOW_ALL_TIME = !!CFG.ALLOW_ALL_TIME_VIEWS;
@@ -226,7 +227,7 @@
 
   class PlaylistStream {
     constructor(playlistId, { cutoff = 0, force = false, onScan, match = null } = {}) {
-      Object.assign(this, { playlistId, cutoff, force, onScan, match, buf: [], done: false, pageToken: "", scanned: 0 });
+      Object.assign(this, { playlistId, cutoff, force, onScan, match, buf: [], done: false, pageToken: "", scanned: 0, oldest: Date.now() });
     }
     async more() {
       let res;
@@ -244,6 +245,7 @@
       const ids = [];
       for (const c of rows) {
         const t = c.videoPublishedAt ? Date.parse(c.videoPublishedAt) : NaN;
+        if (t < this.oldest) this.oldest = t;
         if (this.cutoff && t < this.cutoff) { reachedCutoff = true; continue; }
         ids.push(c.videoId);
       }
@@ -259,36 +261,61 @@
     }
   }
 
-  // 기간 내 업로드를 모두 모아 조회수로 정렬
+  // 기간별 조회수순. 업로드가 적은 채널은 기간 내 업로드를 모두 모아 정렬하고(정확·저렴),
+  // 기간 내 업로드가 SCAN_MAX_PAGES 페이지를 넘을 채널(KBS·EBS 등)은 YouTube 검색(기간 지정, 조회수순)으로 전환
   class PeriodViewsStream {
-    constructor(playlistId, opts) {
-      this.inner = new PlaylistStream(playlistId, opts);
-      this.buf = []; this.done = false; this.capped = false;
+    constructor(channel, type, { cutoff, force = false, onScan, match = null }) {
+      Object.assign(this, { channel, type, cutoff, force, match, buf: [], done: false, capped: false, viaSearch: false });
+      this.inner = new PlaylistStream(playlistFor(channel.id, type), { cutoff, force, onScan, match });
+    }
+    // 지금까지 스캔한 속도로 기간 전체에 필요한 페이지 수를 추정
+    pagesNeeded() {
+      const span = Date.now() - this.inner.oldest;
+      const pages = this.inner.scanned / 50;
+      return span > 0 ? ((Date.now() - this.cutoff) / span) * pages : Infinity;
     }
     async more() {
-      while (!this.inner.done && this.inner.scanned < PERIOD_SCAN_CAP) await this.inner.more();
+      if (this.search) return this.pullSearch();
+      // 키워드 필터 채널은 검색 결과를 걸러내면 거의 남지 않으므로 항상 스캔
+      const cap = this.match ? FILTERED_SCAN_CAP : PERIOD_SCAN_CAP;
+      do {
+        await this.inner.more();
+        if (!this.match && !this.inner.done && this.pagesNeeded() > SCAN_MAX_PAGES) {
+          this.viaSearch = true;
+          this.search = new SearchViewsStream(this.channel.id, this.type === "shorts", {
+            force: this.force, publishedAfter: new Date(this.cutoff).toISOString(),
+          });
+          this.buf = this.search.buf;
+          return this.pullSearch();
+        }
+      } while (!this.inner.done && this.inner.scanned < cap);
       this.capped = !this.inner.done;
       this.buf = this.inner.buf.sort((a, b) => b.views - a.views);
       this.done = true;
     }
+    async pullSearch() {
+      await this.search.more();
+      this.done = this.search.done;
+    }
   }
 
-  // 전체 기간 조회수순: search.list (요청당 100 유닛)
+  // 조회수순 검색: search.list (요청당 100 유닛)
   class SearchViewsStream {
-    constructor(channelId, shorts, { force = false, filter = "", match = null } = {}) {
-      Object.assign(this, { channelId, shorts, force, filter, match, buf: [], done: false, pageToken: "" });
+    constructor(channelId, shorts, { force = false, filter = "", match = null, publishedAfter = "" } = {}) {
+      Object.assign(this, { channelId, shorts, force, filter, match, publishedAfter, buf: [], done: false, pageToken: "" });
     }
     async more() {
       const res = await apiGet("search", {
         part: "id", channelId: this.channelId, type: "video", order: "viewCount", q: this.filter,
+        publishedAfter: this.publishedAfter,
         maxResults: 50, pageToken: this.pageToken, fields: "nextPageToken,items(id/videoId)",
       }, { cost: 100, force: this.force });
       const ids = (res.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
       const vids = (await fetchVideos(ids, this.force))
         .filter((v) => !this.match || this.match(v))
-        .filter((v) => v.durationSec > 0 && (this.shorts ? v.durationSec <= SHORTS_MAX_SEC : v.durationSec > SHORTS_MAX_SEC))
-        .sort((a, b) => b.views - a.views);
+        .filter((v) => v.durationSec > 0 && (this.shorts ? v.durationSec <= SHORTS_MAX_SEC : v.durationSec > SHORTS_MAX_SEC));
       this.buf.push(...vids);
+      this.buf.sort((a, b) => b.views - a.views);
       this.pageToken = res.nextPageToken || "";
       if (!this.pageToken) this.done = true;
     }
@@ -365,7 +392,7 @@
       if (ui.tab === "all" || CATEGORIES[+ui.tab]) state.tab = ui.tab;
       if (["videos", "shorts"].includes(ui.type)) state.type = ui.type;
       if (["date", "views"].includes(ui.sort)) state.sort = ui.sort;
-      if (["7", "30", "90", "365"].includes(ui.period) || (ALLOW_ALL_TIME && ui.period === "all")) state.period = ui.period;
+      if (["7", "30", "90", "365", "1095"].includes(ui.period) || (ALLOW_ALL_TIME && ui.period === "all")) state.period = ui.period;
     } catch { /* noop */ }
   }
 
@@ -488,7 +515,7 @@
           state.notes.push(`전체 기간 조회수순은 YouTube 검색 기반이라 API 사용량이 큽니다(요청당 100). ${shorts ? "쇼츠는 3분 이하 영상으로 분류합니다." : "3분 이하 영상은 제외됩니다."}`);
         } else {
           const cutoff = Date.now() - +state.period * 864e5;
-          streams = chans.map((c) => new PeriodViewsStream(playlistFor(c.id, state.type), { cutoff, force, onScan, match: c.match }));
+          streams = chans.map((c) => new PeriodViewsStream(c, state.type, { cutoff, force, onScan, match: c.match }));
           key = (v) => v.views;
         }
         state.merger = new Merger(streams, key);
@@ -504,6 +531,10 @@
         els.grid.innerHTML = "";
         const capped = merger.streams.filter((s) => s.capped).length;
         if (capped) state.notes.push(`업로드가 많은 채널은 최근 ${PERIOD_SCAN_CAP.toLocaleString()}개 영상까지만 집계했습니다.`);
+        const viaSearch = merger.streams.filter((s) => s.viaSearch).map((s) => esc(s.channel.title));
+        if (viaSearch.length) {
+          state.notes.push(`${viaSearch.join(", ")}: 업로드가 매우 많아 YouTube 검색(기간·조회수순)으로 집계했습니다. 이 채널은 3분 이하 영상을 쇼츠로 분류합니다.`);
+        }
       }
       const start = state.items.length;
       batch.forEach((v) => state.seen.add(v.id));
