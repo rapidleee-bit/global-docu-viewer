@@ -5,6 +5,8 @@
 //  2) CHANNELS: 카테고리(탭)별로 연동할 유튜브 채널 목록
 //     - "@핸들" 또는 "UC로 시작하는 채널 ID" 둘 다 가능
 //     - 한 카테고리에 여러 채널을 넣으면 자동으로 합쳐서 정렬됨
+//     - 특정 채널에만 필터를 걸려면 { handle: "@핸들", filter: {...} } 형태로 적음
+//       (카테고리에 filter를 두면 그 탭의 모든 채널에 적용)
 //     - filter: 다큐만 골라내는 조건 (없으면 전체 표시). 키워드는 "|"로 구분, 대소문자 무시
 //         include    : 이 중 하나가 있어야 표시
 //         exclude    : 제목·설명·태그에 이 중 하나라도 있으면 제외 (토크쇼·예능 등)
@@ -19,8 +21,9 @@ window.VIEWER_CONFIG = {
   CHANNELS: [
     {
       name: "BBC",
-      channels: ["@BBC"],
-      filter: {
+      channels: [
+        // @BBC는 예능·드라마가 대부분이라 다큐 필터 적용
+        { handle: "@BBC", filter: {
         include: [
           // 다큐 명시
           "documentary|documentaries|docuseries|docu-series|docudrama|panorama|storyville",
@@ -46,7 +49,10 @@ window.VIEWER_CONFIG = {
         ].join("|"),
         minMinutes: 0,
         matchDescription: true,
-      },
+        } },
+        // BBC deepwatch: BBC의 청년층 다큐 전문 채널 (BBC Three 계열) — 전부 다큐라 필터 없음
+        "@bbcdeepwatch",
+      ],
     },
     { name: "BBC Earth",  channels: ["@bbcearth", "@BBCEarthScience"] },
     { name: "NOVA PBS",   channels: ["@novapbs"] },
