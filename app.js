@@ -211,7 +211,11 @@
 
   function describeFilter(f, shorts, brief = false) {
     const parts = [];
-    if (f.include) parts.push(`${f.matchDescription ? "제목·설명·태그" : "제목"}에 '${f.include.split("|").join("', '")}' 포함`);
+    if (f.include) {
+      const where = f.matchDescription ? "제목·설명·태그" : "제목";
+      parts.push(brief ? `${where}에 다큐·시사 키워드 ${f.include.split("|").length}개 중 하나 포함`
+        : `${where}에 '${f.include.split("|").join("', '")}' 포함`);
+    }
     if (f.exclude) {
       parts.push(brief ? `예능·토크쇼 등 제외 키워드 ${f.exclude.split("|").length}개`
         : `'${f.exclude.split("|").join("', '")}' 제외`);
